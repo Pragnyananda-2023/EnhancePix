@@ -52,7 +52,7 @@ const parseApiError = (error: unknown): Error => {
 // Helper to determine if an error is worth retrying
 const isRetryableError = (error: unknown): boolean => {
     if (error instanceof Error) {
-        // Do not retry on model refusals like safety blocks.
+        // Do not retry on model refusals like safety blocks or other terminal reasons.
         if (error.message.includes("safety policies") || error.message.includes("model stopped for the following reason")) {
             return false;
         }
@@ -69,6 +69,7 @@ const isRetryableError = (error: unknown): boolean => {
             return true;
         }
     }
+    // Don't retry unknown error types by default.
     return false;
 }
 
@@ -126,13 +127,18 @@ export const editImage = async ({ base64Data, mimeType, prompt }: EditImageProps
       
     } catch (error) {
         const isLastAttempt = attempt > MAX_RETRIES;
-        const shouldRetry = !isLastAttempt && isRetryableError(error);
 
-        if (shouldRetry) {
-             console.warn(`Attempt ${attempt} to edit image failed. Retrying...`);
-             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * Math.pow(2, attempt - 1)));
+        if (isRetryableError(error)) {
+            if (isLastAttempt) {
+                console.error(`Editing image failed after ${MAX_RETRIES + 1} attempts. This was the final attempt. Original error:`, error);
+                throw parseApiError(error);
+            } else {
+                console.warn(`Attempt ${attempt} to edit image failed with a retryable error. Retrying...`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * Math.pow(2, attempt - 1)));
+            }
         } else {
-            console.error(`Editing image failed after ${attempt} attempt(s). Original error:`, error);
+            // This is a non-retryable error. Fail immediately.
+            console.error(`Editing image failed with a non-retryable error on attempt ${attempt}. Original error:`, error);
             throw parseApiError(error);
         }
     }
