@@ -1,0 +1,5 @@
+{
+  "name": "EnhancePix",
+  "description": "An AI-powered photo editor to enhance, upscale, upcrop, and improve your images. Simply upload a photo, provide a prompt or choose a suggestion, and let AI do the magic.",
+  "requestFramePermissions": []
+}
